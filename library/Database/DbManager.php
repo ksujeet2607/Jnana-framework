@@ -7,6 +7,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
+use Core\ApplicationPaths;
 use Library\Security\AuthManager;
 use Library\Session\SessionManager;
 use Psr\SimpleCache\CacheInterface;
@@ -195,8 +196,8 @@ class DbManager
      */
     protected function getCompanyEntityPaths(): array
     {
-        // change this path to match your PSR-4 layout
-        return [dirname(__DIR__, 1) . '/Entities/Company'];
+        // Company-specific entities belong to the consuming application, not this package.
+        return [ApplicationPaths::instance()->app('app/Entities/Company')];
     }
 
     /**
@@ -212,7 +213,8 @@ class DbManager
      */
     protected function guessProxyDir(): string
     {
-        $dir = dirname(__DIR__, 2) . '/app/Proxies';
+        // Doctrine-generated proxies are application runtime files.
+        $dir = ApplicationPaths::instance()->app('app/Proxies');
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);
         }

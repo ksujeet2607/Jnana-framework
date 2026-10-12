@@ -23,7 +23,10 @@ class Router
     private Dispatcher $dispatcher;
     private Request $request;
 
-    public function __construct(private LoggerInterface $logger){}
+    public function __construct(
+        private LoggerInterface $logger,
+        private ApplicationPaths $paths
+    ) {}
 
     /**
      * Registers routes from a list of namespaces.
@@ -31,7 +34,7 @@ class Router
     public function registerRoutesFromNamespace(array $namespaces): void
     {
         foreach ($namespaces as $namespace) {
-            $directory = __DIR__ . '/../' . str_replace('\\', DIRECTORY_SEPARATOR, $namespace);
+            $directory = $this->paths->namespaceDirectory($namespace);
             $this->controllerClasses = array_merge(
                 $this->controllerClasses,
                 $this->getClassesInNamespace($namespace, $directory)

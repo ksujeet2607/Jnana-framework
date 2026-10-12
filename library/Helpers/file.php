@@ -21,8 +21,8 @@ if (!function_exists('unlink_file')) {
         // Convert into absolute paths and delete if exists
         foreach ($deleteList as $relPath) {
             $pathsToCheck = [
-                __DIR__.'/../../'.$relPath,
-                __DIR__.'/../../public/'.$relPath,
+                base_path($relPath),
+                public_path($relPath),
             ];
 
             foreach ($pathsToCheck as $absolutePath) {
@@ -47,7 +47,9 @@ if (!function_exists('get_file_thumbnail')) {
      */
     function get_file_thumbnail(string $path, int $width = 100, int $height = 100): ?string
     {
-        $filePath = __DIR__.'/../../'.$path;
+        $filePath = str_starts_with(ltrim($path, '/\\'), 'public/')
+            ? public_path(substr(ltrim($path, '/\\'), 7))
+            : base_path(ltrim($path, '/\\'));
         if (!file_exists($filePath)) {
             return null;
         }

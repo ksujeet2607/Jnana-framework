@@ -31,7 +31,6 @@ if (! function_exists('asset_url')) {
     function asset_url(string $path):string
     {
         $assetDir = 'public/assets/';
-        $baseUri = __DIR__.'/../../'.$assetDir;
 
         if(substr($path, 0, strlen($assetDir)) === $assetDir){
             $path = substr($path, strlen($assetDir));
@@ -39,7 +38,7 @@ if (! function_exists('asset_url')) {
 
         $path = ltrim($path, '/');
 
-        if(file_exists($baseUri.$path)){
+        if (is_file(public_path('assets/' . $path))) {
             return base_uri().$assetDir.$path;
         }
 
@@ -66,11 +65,7 @@ if (! function_exists('service_uri')) {
 if (! function_exists('absolute_path')) {
     function absolute_path(string $path):string
     {
-        $baseUri = __DIR__.'/../../';
-
-        $path = ltrim($path, '/');
-
-        return $baseUri.$path;
+        return base_path(ltrim($path, '/\\'));
 
     }
 

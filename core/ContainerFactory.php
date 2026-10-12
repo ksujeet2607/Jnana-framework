@@ -25,37 +25,33 @@ use Symfony\Contracts\Cache\CacheInterface;
 
 final class ContainerFactory
 {
-    private const PROVIDERS_DIR = __DIR__ . '/../app/Providers';
-    private const PROVIDERS_NAMESPACE = 'App\\Providers';
-
-    private const VALIDATORS_DIR = __DIR__ . '/../app/Validators';
-    private const VALIDATORS_NAMESPACE = 'App\\Validators';
-
     public static function create(ConfigManager $config, LoggerInterface $logger): Container
     {
+        $paths = new ApplicationPaths($config->applicationRoot(), dirname(__DIR__));
         $containerBuilder = new ContainerBuilder();
 
         $containerBuilder->useAttributes(true);
         $containerBuilder->useAutowiring(true);
 
-        self::registerCoreDefinitions($containerBuilder, $config, $logger);
+        self::registerCoreDefinitions($containerBuilder, $config, $logger, $paths);
         self::registerAuth($containerBuilder, $config, $logger);
-        self::registerEntityManager($containerBuilder, $logger);
+        self::registerEntityManager($containerBuilder, $logger, $paths);
         self::registerCache($containerBuilder);
 
         self::applyManualBindings($containerBuilder, $config, $logger);
-        self::registerProviders($containerBuilder, $config, $logger);
-        self::registerValidators($containerBuilder, $logger);
+        self::registerProviders($containerBuilder, $config, $logger, $paths);
+        self::registerValidators($containerBuilder, $logger, $paths);
 
         $logger->info('Container created successfully.');
 
         return $containerBuilder->build();
     }
 
-    private static function registerCoreDefinitions(ContainerBuilder $containerBuilder, ConfigManager $config, LoggerInterface $logger): void
+    private static function registerCoreDefinitions(ContainerBuilder $containerBuilder, ConfigManager $config, LoggerInterface $logger, ApplicationPaths $paths): void
     {
         $containerBuilder->addDefinitions([
             ConfigManager::class => $config,
+            ApplicationPaths::class => $paths,
             LoggerInterface::class => $logger,
             DatabaseInterface::class => !empty($config->getDatabaseConfig())
                 ? \DI\create(Database::class)->constructor($config->getDatabaseConfig())
@@ -95,11 +91,11 @@ final class ContainerFactory
         ]);
     }
 
-    private static function registerEntityManager(ContainerBuilder $containerBuilder, LoggerInterface $logger): void
+    private static function registerEntityManager(ContainerBuilder $containerBuilder, LoggerInterface $logger, ApplicationPaths $paths): void
     {
         $containerBuilder->addDefinitions([
             NullEntityManager::class => fn() => new NullEntityManager(),
-            EntityManagerInterface::class => function (ContainerInterface $c) {
+            EntityManagerInterface::class => function (ContainerInterface $c) use ($paths) {
                 $database = $c->get(DatabaseInterface::class);
                 if ($database instanceof NullDatabase) {
                     return $c->get(NullEntityManager::class);
@@ -107,8 +103,12 @@ final class ContainerFactory
 
                 $isDevMode = filter_var(getenv('APP_DEBUG'), FILTER_VALIDATE_BOOLEAN);
 
-                $ormConfig = ORMSetup::createAttributeMetadataConfiguration([__DIR__ . '/../Entities'], $isDevMode);
-                $ormConfig->setProxyDir(__DIR__ . '/../app/Proxies');
+                $ormConfig = ORMSetup::createAttributeMetadataConfiguration([$paths->app('app/Entities')], $isDevMode);
+                $proxyDir = $paths->app('app/Proxies');
+                if (!is_dir($proxyDir)) {
+                    mkdir($proxyDir, 0775, true);
+                }
+                $ormConfig->setProxyDir($proxyDir);
                 $ormConfig->setProxyNamespace('App\\Proxies');
 
                 return new EntityManager($database->getConnection(), $ormConfig);
@@ -127,10 +127,10 @@ final class ContainerFactory
         }
     }
 
-    private static function registerProviders(ContainerBuilder $cb, ConfigManager $config, LoggerInterface $logger): void
+    private static function registerProviders(ContainerBuilder $cb, ConfigManager $config, LoggerInterface $logger, ApplicationPaths $paths): void
     {
         $configuredProviders = $config->getDefinitions()['providers'] ?? [];
-        $discovered = self::discoverClasses(self::PROVIDERS_DIR, self::PROVIDERS_NAMESPACE, $logger, 'providers');
+        $discovered = self::discoverClasses($paths->app('app/Providers'), 'App\\Providers', $logger, 'providers');
 
         $providers = array_unique([...$configuredProviders, ...$discovered]);
 
@@ -156,9 +156,9 @@ final class ContainerFactory
         $logger->info('Service providers registered', ['providers' => $providers]);
     }
 
-    private static function registerValidators(ContainerBuilder $cb, LoggerInterface $logger): void
+    private static function registerValidators(ContainerBuilder $cb, LoggerInterface $logger, ApplicationPaths $paths): void
     {
-        $validators = self::discoverClasses(self::VALIDATORS_DIR, self::VALIDATORS_NAMESPACE, $logger, 'validators');
+        $validators = self::discoverClasses($paths->app('app/Validators'), 'App\\Validators', $logger, 'validators');
 
         foreach ($validators as $class) {
             $cb->addDefinitions([

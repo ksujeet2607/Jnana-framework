@@ -2,6 +2,7 @@
 
 namespace Core\CLI\Commands;
 
+use Core\ApplicationPaths;
 use Library\Utilities\Utility;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -23,10 +24,16 @@ class GenerateMiddlewareCommand extends Command
     {
         $name = $input->getArgument('name');
         $middlewareName = ucfirst($name) . 'Middleware';
-        $middlewarePath = __DIR__ . '/../../../app/Middlewares/' . $middlewareName . '.php';
+        $middlewarePath = ApplicationPaths::instance()->app('app/Middlewares/' . $middlewareName . '.php');
 
         if (file_exists($middlewarePath)) {
             $output->writeln("<error>Controller '$middlewareName' already exists.</error>");
+            return Command::FAILURE;
+        }
+
+        $dir = dirname($middlewarePath);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            $output->writeln("<error>Unable to create middleware directory: {$dir}</error>");
             return Command::FAILURE;
         }
 
@@ -55,7 +62,7 @@ use Library\Http\Response;
 use Library\Middleware\Middleware;
 use Library\Middleware\MiddlewareInterface;
 
-class AccessControlMiddleware extends Middleware implements MiddlewareInterface
+class {$middlewareName} extends Middleware implements MiddlewareInterface
 {
 
     /**

@@ -13,28 +13,33 @@ use RuntimeException;
  */
 final class ConfigManager
 {
-    private const CONFIG_DIR = __DIR__ . '/../config/';
-    private const ROOT_CONFIG_FILE = self::CONFIG_DIR . 'Config.php';
-
     private array $config = [];
+    private readonly string $configDir;
+    private readonly string $applicationRoot;
 
-    public function __construct()
+    public function __construct(?string $applicationRoot = null)
     {
-        if (!is_dir(self::CONFIG_DIR)) {
-            throw new RuntimeException('Configuration directory not found: ' . self::CONFIG_DIR);
+        $this->applicationRoot = $applicationRoot !== null
+            ? (realpath($applicationRoot) ?: rtrim($applicationRoot, DIRECTORY_SEPARATOR))
+            : ApplicationPaths::instance()->applicationRoot();
+        $this->configDir = rtrim($this->applicationRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'config';
+        $rootConfigFile = $this->configDir . DIRECTORY_SEPARATOR . 'Config.php';
+
+        if (!is_dir($this->configDir)) {
+            throw new RuntimeException('Configuration directory not found: ' . $this->configDir);
         }
 
         // Load the root Config.php file (if present), merged directly into the top level.
-        if (file_exists(self::ROOT_CONFIG_FILE)) {
-            $rootConfig = include self::ROOT_CONFIG_FILE;
+        if (file_exists($rootConfigFile)) {
+            $rootConfig = include $rootConfigFile;
             if ($rootConfig !== null && !is_array($rootConfig)) {
-                throw new RuntimeException('Configuration file must return an array or null: ' . self::ROOT_CONFIG_FILE);
+                throw new RuntimeException('Configuration file must return an array or null: ' . $rootConfigFile);
             }
             $this->config = $rootConfig ?? [];
         }
 
         // Load every other config file under a key matching its filename.
-        $files = glob(self::CONFIG_DIR . '*.php') ?: [];
+        $files = glob($this->configDir . DIRECTORY_SEPARATOR . '*.php') ?: [];
         foreach ($files as $file) {
             $filename = pathinfo($file, PATHINFO_FILENAME);
             if (strtolower($filename) === 'config') {
@@ -165,5 +170,10 @@ final class ConfigManager
     public function all(): array
     {
         return $this->config;
+    }
+
+    public function applicationRoot(): string
+    {
+        return $this->applicationRoot;
     }
 }

@@ -36,7 +36,7 @@ final class AppManager
         private readonly ConfigManager   $config,
         private readonly LoggerInterface $logger
     ) {
-        $this->router = new Router($this->logger);
+        $this->router = new Router($this->logger, $container->get(ApplicationPaths::class));
         $container->set('router', $this->router);
         try {
             $this->loadGlobalMiddlewares();

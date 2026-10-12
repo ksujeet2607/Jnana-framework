@@ -18,14 +18,14 @@ class View
             throw new ViewNotFoundException("View '{$view}' not found");
         }
 
-        $templatePath = __DIR__ . '/../../public/views/' . $this->normalize($view);
+        $templatePath = view_path($this->normalize($view));
 
         $mergedParameters = array_merge(
             $this->data,
             $parameters
         );
 
-        $cachePath = __DIR__ . '/../../storage/framework/temp/cache';
+        $cachePath = cache_path();
 
         $compiler = new TemplateCompiler();
         $cache    = new TemplateCache(
@@ -47,7 +47,7 @@ class View
 
     public function exists(string $view): bool
     {
-        $path = __DIR__ . "/../../public/views/" . $this->normalize($view);
+        $path = view_path($this->normalize($view));
         return is_file($path);
     }
 

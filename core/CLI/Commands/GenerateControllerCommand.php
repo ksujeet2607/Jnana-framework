@@ -2,6 +2,7 @@
 
 namespace Core\CLI\Commands;
 
+use Core\ApplicationPaths;
 use Library\Utilities\Utility;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -25,7 +26,7 @@ class GenerateControllerCommand extends Command
     {
         $name = $input->getArgument('name');
         $controllerName = preg_replace('/Controller$/i', '', ucfirst($name)) . 'Controller';
-        $controllerPath = __DIR__ . '/../../../app/Controllers/' . $controllerName . '.php';
+        $controllerPath = ApplicationPaths::instance()->app('app/Controllers/' . $controllerName . '.php');
 
         if (file_exists($controllerPath)) {
             $output->writeln("<error>Controller '$controllerName' already exists.</error>");

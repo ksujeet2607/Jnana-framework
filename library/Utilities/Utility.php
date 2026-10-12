@@ -380,7 +380,7 @@ trait Utility {
         if(str_contains("css/", $path)){
             $path = str_replace("css/", '', $path);
         }
-        $path = __DIR__."/../../public/".$path;
+        $path = public_path($path);
         if(file_exists($path)){
             unlink($path);
             return true;
