@@ -9,10 +9,10 @@ Routes are declared using PHP attributes on public controller methods:
 ```php
 namespace App\Controllers;
 
-use Library\Routes\Get;
-use Library\Routes\Post;
+use Jnana\Routes\Get;
+use Jnana\Routes\Post;
 
-final class ReportController extends BaseController
+final class ReportController extends Foundation
 {
     #[Get('/reports')]
     public function index()
@@ -35,7 +35,7 @@ final class ReportController extends BaseController
 Use `#[RouteGroup]` on a controller to add a prefix and middleware to every route on that controller:
 
 ```php
-use Library\Routes\RouteGroup;
+use Jnana\Routes\RouteGroup;
 
 #[RouteGroup(prefix: '/admin', middlewares: [AdminMiddleware::class])]
 final class ReportController extends BaseController
@@ -59,9 +59,9 @@ The route path becomes `/admin/reports`. Prefix normalization adds a leading sla
 Use middleware class names or `[MiddlewareClass::class, ['option' => 'value']]` definitions. Middleware classes must be resolvable by the DI container and implement `MiddlewareInterface`.
 
 ```php
-use Library\Http\Request;
-use Library\Http\Response;
-use Library\Middleware\MiddlewareInterface;
+use Jnana\Http\Request;
+use Jnana\Http\Response;
+use Jnana\Middleware\MiddlewareInterface;
 
 final class ExampleMiddleware implements MiddlewareInterface
 {
@@ -96,5 +96,5 @@ The router passes matched route parameters to the controller action in the order
 - Confirm the namespace prefix maps to the correct directory in `ApplicationPaths`.
 - Confirm Composer's PSR-4 mapping and PHP namespace match the file path.
 - Check spelling/case of attribute paths and HTTP methods.
-- Confirm the controller extends the application's `BaseController` and that dependencies can be resolved.
+- Confirm the controller extends the application's `Foundation` and that dependencies can be resolved.
 - Inspect application logs for route registration or middleware exceptions.

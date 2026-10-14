@@ -34,16 +34,16 @@
     "autoload": {
         "psr-4": {
             "Core\\": "core/",
-            "Library\\": "library/"
+            "Jnana\\": "jnana/"
         },
         "files": [
-            "library/Helpers/Helpers.php",
-            "library/Exceptions/exceptions.php"
+            "jnana/Helpers/Helpers.php",
+            "jnana/Exceptions/exceptions.php"
         ]
     },
     "autoload-dev": {
         "psr-4": {
-            "Library\\Tests\\": "tests/"
+            "Jnana\\Tests\\": "tests/"
         }
     },
     "minimum-stability": "stable",

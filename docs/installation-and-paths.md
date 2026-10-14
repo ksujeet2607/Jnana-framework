@@ -73,7 +73,7 @@ app_path('Controllers/WelcomeController.php');
 config_path('Config.php');
 storage_path('framework/logs/app.log');
 public_path('assets/app.css');
-framework_path('library/Http/Request.php');
+framework_path('jnana/Http/Request.php');
 vendor_path('autoload.php');
 view_path('welcome.php');
 cache_path('templates');

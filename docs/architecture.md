@@ -4,17 +4,17 @@
 
 `jnana/framework` is the reusable runtime. It owns HTTP abstractions, routing, middleware dispatch, dependency-injection integration, configuration loading, template rendering, security primitives, and framework helpers. It must not depend on application-specific entities, services, controllers, or configuration files.
 
-The consuming project (`jnana/jnana` or another application) owns domain code and runtime configuration. Composer maps `Core\\` to `core/` and `Library\\` to `library/`; the application maps `App\\` to its own `app/` directory.
+The consuming project (`jnana/jnana` or another application) owns domain code and runtime configuration. Composer maps `Core\\` to `core/` and `Library\\` to `jnana/`; the application maps `App\\` to its own `app/` directory.
 
 ## Main areas
 
 - `core/`: application lifecycle (`AppManager`), route discovery (`Router`), config loading (`ConfigManager`), DI setup (`ContainerFactory`), path context (`ApplicationPaths`), error rendering, loading and maintenance management.
-- `library/Http/`: request, response, redirect response, uploaded-file abstraction, and framework base controller.
-- `library/Routes/`: route attributes (`Get`, `Post`, `RouteGroup`, `Route`).
-- `library/Middleware/`: middleware contract, dispatcher, built-in middleware.
-- `library/Security/`: authentication strategies, guards, password hashing, authorization and security services.
-- `library/Database/`: database abstractions and Doctrine/DBAL adapters, including null implementations.
-- `library/Template/`, `library/Utilities/`, `library/Helpers/`, `library/Facades/`: view compilation/rendering, common utilities, procedural helpers and facade access.
+- `jnana/Http/`: request, response, redirect response, uploaded-file abstraction, and framework base controller.
+- `jnana/Routes/`: route attributes (`Get`, `Post`, `RouteGroup`, `Route`).
+- `jnana/Middleware/`: middleware contract, dispatcher, built-in middleware.
+- `jnana/Security/`: authentication strategies, guards, password hashing, authorization and security services.
+- `jnana/Database/`: database abstractions and Doctrine/DBAL adapters, including null implementations.
+- `jnana/Template/`, `jnana/Utilities/`, `jnana/Helpers/`, `jnana/Facades/`: view compilation/rendering, common utilities, procedural helpers and facade access.
 - `core/CLI/Commands/`: bundled console command implementations. Registering/executing commands is the responsibility of the application's CLI entry point.
 
 ## Request lifecycle

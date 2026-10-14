@@ -4,13 +4,13 @@ This documentation is for maintainers of `jnana/framework` and developers who ne
 
 ## Documentation map
 
-- [Architecture](architecture.md) — package boundaries, request lifecycle, and design rules.
-- [Installation and application paths](installation-and-paths.md) — Composer installation and `ApplicationPaths`.
-- [Routing and middleware](routing-and-middleware.md) — attribute routes, route discovery, and middleware order.
-- [Configuration and dependency injection](configuration-and-di.md) — `ConfigManager`, definitions, providers, and validators.
-- [HTTP, controllers, and views](http-controllers-and-views.md) — request/response conventions and template rendering.
-- [Database and security](database-and-security.md) — Doctrine integration, auth strategies, guards, CSRF, and security boundaries.
-- [Maintenance and troubleshooting](maintenance-and-troubleshooting.md) — safe change process and common failures.
+- [Architecture](docs/architecture.md) — package boundaries, request lifecycle, and design rules.
+- [Installation and application paths](docs/installation-and-paths.md) — Composer installation and `ApplicationPaths`.
+- [Routing and middleware](docs/routing-and-middleware.md) — attribute routes, route discovery, and middleware order.
+- [Configuration and dependency injection](docs/configuration-and-di.md) — `ConfigManager`, definitions, providers, and validators.
+- [HTTP, controllers, and views](docs/http-controllers-and-views.md) — request/response conventions and template rendering.
+- [Database and security](docs/database-and-security.md) — Doctrine integration, auth strategies, guards, CSRF, and security boundaries.
+- [Maintenance and troubleshooting](docs/maintenance-and-troubleshooting.md) — safe change process and common failures.
 
 ## Source of truth
 

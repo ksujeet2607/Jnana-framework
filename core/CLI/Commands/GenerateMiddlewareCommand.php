@@ -3,7 +3,7 @@
 namespace Core\CLI\Commands;
 
 use Core\ApplicationPaths;
-use Library\Utilities\Utility;
+use Jnana\Utilities\Utility;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -57,10 +57,10 @@ class GenerateMiddlewareCommand extends Command
 
 namespace App\Middlewares;
 
-use Library\Http\Request;
-use Library\Http\Response;
-use Library\Middleware\Middleware;
-use Library\Middleware\MiddlewareInterface;
+use Jnana\Http\Request;
+use Jnana\Http\Response;
+use Jnana\Middleware\Middleware;
+use Jnana\Middleware\MiddlewareInterface;
 
 class {$middlewareName} extends Middleware implements MiddlewareInterface
 {

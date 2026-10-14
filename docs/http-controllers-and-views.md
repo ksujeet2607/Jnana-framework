@@ -11,7 +11,7 @@ Application controllers should normally extend an application-owned base control
 ```php
 namespace App\Controllers;
 
-use Library\Http\Controllers\BaseController as FrameworkBaseController;
+use Jnana\Http\Controllers\Foundation as FrameworkBaseController;
 
 abstract class BaseController extends FrameworkBaseController
 {

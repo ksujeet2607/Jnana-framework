@@ -1,0 +1,162 @@
+<?php
+
+namespace Jnana\Security;
+
+use Jnana\Session\SessionManager;
+use function DI\value;
+
+class AuthManager
+{
+    private AuthStrategyInterface $strategy;
+    private SessionManager $sessionManager;
+    private ?string $lastError = null;
+
+    // Error code → message mapping
+    private array $errorMessages = [
+        'user_not_found'       => 'User account not found.',
+        'account_inactive'     => 'Your account is inactive. Please contact admin.',
+        'invalid_credentials'  => 'Incorrect username or password.',
+        'authentication_failed'=> 'Login failed. Please try again.',
+        'session_expired'      => 'Your session has expired. Please log in again.',
+    ];
+
+    public function __construct(AuthStrategyInterface $strategy, SessionManager $sessionManager)
+    {
+        $this->strategy = $strategy;
+        $this->sessionManager = $sessionManager;
+
+        // Restore user from session if available
+        if ($sessionManager->has('user')) {
+            $this->setUser($sessionManager->get('user'));
+        }
+    }
+
+    public function authenticate(string $username, string $password): bool
+    {
+        $authenticated = $this->strategy->authenticate($username, $password);
+
+        if ($authenticated && $this->getUser()) {
+            $this->sessionManager->set('user', $this->getUser());
+            $this->lastError = null;
+        } else {
+            // Capture error from strategy
+            $code = method_exists($this->strategy, 'getLastError')
+                ? $this->strategy->getLastError()
+                : 'authentication_failed';
+
+            $this->lastError = $this->errorMessages[$code] ?? $this->errorMessages['authentication_failed'];
+        }
+
+        return $authenticated;
+    }
+
+    public function getUser(): ?array
+    {
+        return $this->strategy->getUser();
+    }
+
+    public function getUserId(): ?int
+    {
+        return $this->getUser()['id'] ?? null;
+    }
+
+    public function setUser(?array $user): void
+    {
+        $this->strategy->setCurrentUser($user);
+
+        if ($user === null) {
+            $this->sessionManager->remove('user');
+        } else {
+            $this->sessionManager->set('user', $user);
+        }
+    }
+
+    public function isAuthenticated(): bool
+    {
+        return $this->getUser() !== null;
+    }
+
+    public function hasRole(string $role): bool
+    {
+        $user = $this->getUser();
+        if (!$user || !isset($user['roles']) || !is_array($user['roles'])) {
+            return false;
+        }
+        return in_array($role, $user['roles'], true);
+    }
+
+    public function logout(): void
+    {
+        $this->strategy->logout();
+        $this->sessionManager->remove('user');
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    public function check(): bool
+    {
+        return $this->isAuthenticated();
+    }
+
+    public function user(): ?array
+    {
+        return $this->getUser();
+    }
+
+    public function id(): ?int
+    {
+        return $this->getUserId();
+    }
+
+    public function can(string $permission): bool
+    {
+        $user = $this->getUser();
+
+        if (! $user) {
+            return false;
+        }
+
+        // Later: role → permission mapping
+        return true;
+    }
+
+    /**
+     * @return bool
+     * Is user has admin scope
+     */
+    public function isAdminScope(): bool
+    {
+        return $this->getUser()['scope'] === 'admin';
+    }
+
+    /**
+     * @return bool
+     * Is user has company scope
+     */
+    public function isCompanyScope(): bool
+    {
+        return $this->getUser()['scope'] === 'company';
+    }
+
+    /**
+     * Check whether the current user's auth_level matches the given
+     * access-level enum case. Accepts any backed enum — your app defines
+     * its own access-level enum (e.g. `enum AppAccessEnum: string { case ADMIN
+     * = 'admin'; case COMPANY = 'company'; }`) and passes a case of it here.
+     *
+     * @param \BackedEnum $accessLevel
+     */
+    public function userAuthLevel(\BackedEnum $accessLevel): bool
+    {
+        return ($this->getUser()['auth_level'] ?? null) === $accessLevel->value;
+    }
+
+    public function getUserCompanyId(): ?int
+    {
+        return $this->user()['company_id'];
+    }
+
+}

@@ -2,7 +2,7 @@
 
 namespace Core;
 
-use Library\Facades\View;
+use Jnana\Facades\View;
 use Throwable;
 
 final class ErrorRenderer

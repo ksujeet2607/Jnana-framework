@@ -5,12 +5,12 @@ namespace Core;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 use JetBrains\PhpStorm\NoReturn;
-use Library\Exceptions\HttpException;
-use Library\Exceptions\MethodNotAllowedException;
-use Library\Exceptions\RouteNotFoundException;
-use Library\Middleware\Middleware;
-use Library\Routes\Route;
-use Library\Routes\RouteGroup;
+use Jnana\Exceptions\HttpException;
+use Jnana\Exceptions\MethodNotAllowedException;
+use Jnana\Exceptions\RouteNotFoundException;
+use Jnana\Middleware\Middleware;
+use Jnana\Routes\Route;
+use Jnana\Routes\RouteGroup;
 use Psr\Log\LoggerInterface;
 use function FastRoute\simpleDispatcher;
 

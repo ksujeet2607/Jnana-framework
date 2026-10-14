@@ -3,7 +3,7 @@
 namespace Core\CLI\Commands;
 
 use Core\ApplicationPaths;
-use Library\Utilities\Utility;
+use Jnana\Utilities\Utility;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -59,8 +59,8 @@ class GenerateControllerCommand extends Command
 
 namespace App\Controllers;
 
-use Library\Routes\Get;
-use Library\Routes\RouteGroup;
+use Jnana\Routes\Get;
+use Jnana\Routes\RouteGroup;
 
 #[RouteGroup('/$routeGroup')]
 final class $controllerName extends BaseController
