@@ -135,7 +135,7 @@ final class TemplateCompiler
     {
         return preg_replace(
             '/\{{{\s*(.+?)\s*}}}/',
-            '<?php echo \\Library\\Template\\Escaper::escape($1); ?>',
+            '<?php echo \\Jnana\\Template\\Escaper::escape($1); ?>',
             $code
         );
     }

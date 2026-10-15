@@ -13,7 +13,7 @@ interface MiddlewareInterface
      * @param Request $request
      * @param Response $response
      * @param callable $next
-     * @return \Library\Http\Response
+     * @return \Jnana\Http\Response
      */
     public function process(Request $request, Response $response, callable $next): Response;
 }

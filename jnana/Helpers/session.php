@@ -53,9 +53,9 @@ if (!function_exists('has_error')) {
 //}
 
 if (!function_exists('flash')) {
-    function flash(): \Library\Session\SessionManager
+    function flash(): \Jnana\Session\SessionManager
     {
-        return app(\Library\Session\SessionManager::class);
+        return app(\Jnana\Session\SessionManager::class);
     }
 }
 

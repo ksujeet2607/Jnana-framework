@@ -22,7 +22,7 @@ class EnsureDatabaseMiddleware implements MiddlewareInterface
      */
     public function process(Request $request, Response $response, callable $next): Response
     {
-        if(!$this->database || $this->database instanceof \Library\Database\NullDatabase) {
+        if(!$this->database || $this->database instanceof \Jnana\Database\NullDatabase) {
             $response->setBody("Database connection is required but not available.")->setStatusCode(500);
             $this->logger->warning('Database connection is required but not available: ');
             return $response;

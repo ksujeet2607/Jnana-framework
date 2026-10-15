@@ -2,7 +2,7 @@
 if (! function_exists('view')) {
     function view(string $template, array $data = []):void
     {
-        \Library\Utilities\View::render($template, $data);
+        \Jnana\Utilities\View::render($template, $data);
     }
 }
 

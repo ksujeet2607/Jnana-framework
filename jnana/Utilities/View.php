@@ -35,7 +35,7 @@ class View
 
         $renderer = new TemplateRenderer($compiler, $cache);
 
-        return \Library\Facades\Response::setBody($renderer->render($templatePath, $mergedParameters));
+        return \Jnana\Facades\Response::setBody($renderer->render($templatePath, $mergedParameters));
        
     }
 
