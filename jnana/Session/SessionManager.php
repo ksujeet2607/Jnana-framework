@@ -12,10 +12,54 @@ class SessionManager
     /**
      * Start the session if not already started.
      */
+    private const LAST_ACTIVITY_KEY = '_jnana_last_activity';
+    private const SESSION_CREATED_KEY = '_jnana_session_created';
+
     public function __construct()
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Strict mode rejects uninitialized session IDs supplied by clients.
+            ini_set('session.use_strict_mode', '1');
+            ini_set('session.use_only_cookies', '1');
+            ini_set('session.use_trans_sid', '0');
+
+            $https = isset($_SERVER['HTTPS'])
+                && $_SERVER['HTTPS'] !== ''
+                && strtolower((string) $_SERVER['HTTPS']) !== 'off';
+            $secure = filter_var(getenv('SESSION_COOKIE_SECURE') ?: ($https ? '1' : '0'), FILTER_VALIDATE_BOOLEAN);
+            $httpOnly = filter_var(getenv('SESSION_COOKIE_HTTPONLY') ?: '1', FILTER_VALIDATE_BOOLEAN);
+            $sameSite = getenv('SESSION_COOKIE_SAMESITE') ?: 'Lax';
+            if (!in_array($sameSite, ['Strict', 'Lax', 'None'], true)) {
+                $sameSite = 'Lax';
+            }
+
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'domain' => getenv('SESSION_COOKIE_DOMAIN') ?: '',
+                'secure' => $secure,
+                'httponly' => $httpOnly,
+                'samesite' => $sameSite,
+            ]);
             session_start();
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $now = time();
+            $idleTimeout = max(0, (int) (getenv('SESSION_IDLE_TIMEOUT') ?: 0));
+            $absoluteTimeout = max(0, (int) (getenv('SESSION_ABSOLUTE_TIMEOUT') ?: 0));
+            $lastActivity = (int) ($_SESSION[self::LAST_ACTIVITY_KEY] ?? $now);
+            $createdAt = (int) ($_SESSION[self::SESSION_CREATED_KEY] ?? $now);
+
+            if (($idleTimeout > 0 && ($now - $lastActivity) > $idleTimeout)
+                || ($absoluteTimeout > 0 && ($now - $createdAt) > $absoluteTimeout)) {
+                $this->destroy();
+                session_start();
+                $now = time();
+            }
+
+            $_SESSION[self::SESSION_CREATED_KEY] ??= $now;
+            $_SESSION[self::LAST_ACTIVITY_KEY] = $now;
         }
     }
 
@@ -72,15 +116,14 @@ class SessionManager
 
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'] ?: '/',
+                'domain' => $params['domain'] ?? '',
+                'secure' => (bool) ($params['secure'] ?? false),
+                'httponly' => (bool) ($params['httponly'] ?? true),
+                'samesite' => $params['samesite'] ?? 'Lax',
+            ]);
         }
 
         session_destroy();
@@ -92,7 +135,9 @@ class SessionManager
      */
     public function regenerate(): void
     {
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
     }
 
     /**

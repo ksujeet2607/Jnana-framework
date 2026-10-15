@@ -58,8 +58,11 @@ final class ContainerFactory
                 : \DI\create(NullDatabase::class),
             PDO::class => fn(ContainerInterface $c) => $c->get(DatabaseInterface::class)->getPdo(),
 
-            SecurityService::class => fn(ContainerInterface $c) =>
-            new SecurityService($c->get(ConfigManager::class)->get('Security', [])),
+            SecurityService::class => function (ContainerInterface $c) {
+                // Start and harden the session before SecurityService binds to $_SESSION.
+                $c->get(\Jnana\Session\SessionManager::class);
+                return new SecurityService($c->get(ConfigManager::class)->get('Security', []));
+            },
         ]);
 
         $logger->info('Core services registered');

@@ -7,6 +7,8 @@ use Exception;
 use FastRoute\BadRouteException;
 use Jnana\Contracts\ControllerLifecycle;
 use Jnana\Exceptions\HttpException;
+use Jnana\Exceptions\CSRFTokenExpiredException;
+use Jnana\Exceptions\CSRFValidationException;
 use Jnana\Exceptions\UnauthorizedException;
 use Jnana\Http\RedirectResponse;
 use Jnana\Http\Request;
@@ -279,6 +281,74 @@ final class AppManager
             ]);
 
             $response->send();
+        }
+        catch (CSRFTokenExpiredException $e) {
+            $this->logger->notice('CSRF token expired', ['method' => $method, 'uri' => $uri]);
+
+            $expiredResponse = (new Response())
+                ->setStatusCode(419)
+                ->addHeader('Cache-Control', 'no-store, private');
+
+            if ($request->isApiRequest() || $request->isAjax() || $request->expectsJson()) {
+                $expiredResponse
+                    ->addHeader('Content-Type', 'application/json')
+                    ->setBody([
+                        'error' => 'csrf_token_expired',
+                        'message' => 'Your form session has expired. The token can be refreshed; review and submit again.',
+                        'refresh_url' => '/security/csrf-token',
+                    ]);
+            } else {
+                $expiredResponse
+                    ->addHeader('Content-Type', 'text/html; charset=UTF-8')
+                    ->setBody(<<<'HTML'
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Form session expired</title></head>
+<body>
+<main>
+<h1>Form session expired</h1>
+<p>Your form was not processed because its security token expired. Refreshing the token and returning to your form. Please review the values and submit again.</p>
+<p><a href="javascript:history.back()">Return to the form</a></p>
+</main>
+<script>
+(function () {
+    fetch('/security/csrf-token', {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {'Accept': 'application/json'}
+    }).then(function (response) {
+        if (!response.ok) throw new Error('Token refresh failed');
+        return response.json();
+    }).then(function () {
+        if (history.length > 1) history.back();
+    }).catch(function () {
+        document.querySelector('main').insertAdjacentHTML('beforeend',
+            '<p>Automatic recovery failed. Please sign in again or reload the form.</p>');
+    });
+})();
+</script>
+</body>
+</html>
+HTML);
+            }
+
+            $expiredResponse->send();
+            return;
+        }
+        catch (CSRFValidationException $e) {
+            $this->logger->warning('CSRF validation failed', ['method' => $method, 'uri' => $uri]);
+
+            (new Response())
+                ->setStatusCode(403)
+                ->addHeader('Cache-Control', 'no-store, private')
+                ->addHeader('Content-Type', 'application/json')
+                ->setBody([
+                    'error' => 'csrf_validation_failed',
+                    'message' => 'The request could not be verified. Reload the page and try again.',
+                ])
+                ->send();
+            return;
         }
         catch (HttpException $e) {
 

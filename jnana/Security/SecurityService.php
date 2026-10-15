@@ -27,7 +27,8 @@ class SecurityService
         $this->salt = $securityConfig['salt'] ?? '';
         $this->algorithm = $securityConfig['algorithm'] ?? 'sha256';
         $this->csrfExclusionRoutes = $securityConfig['csrf_exclusion_routes'] ?? [];
-        $this->csrfExclusionMethods = $securityConfig['csrf_exclusion_methods'] ?? [];
+        $this->csrfExclusionMethods = array_map('strtoupper', $securityConfig['csrf_exclusion_methods'] ?? ['GET', 'HEAD', 'OPTIONS']);
+        $this->tokenLifetime = max(60, (int) ($securityConfig['csrf_token_lifetime'] ?? 7200));
 
         $this->post = $post ?? $_POST;
         $this->server = $server ?? $_SERVER;
@@ -79,8 +80,8 @@ class SecurityService
      */
     public function validate(string $method, string $uri, ?Request $request): bool
     {
-        // Skip validation for excluded routes or methods
-        if (in_array($uri, $this->csrfExclusionRoutes, true) || in_array($method, $this->csrfExclusionMethods, true)) {
+        if (in_array($uri, $this->csrfExclusionRoutes, true)
+            || in_array(strtoupper($method), $this->csrfExclusionMethods, true)) {
             return true;
         }
 
@@ -88,8 +89,42 @@ class SecurityService
     }
 
     /**
-     * Insert a hidden CSRF token input field into forms.
+     * Whether the CSRF token has expired, including a lost session token when
+     * the client presents a token from an older page. Such requests remain
+     * rejected; the distinction only lets the client recover the token.
      */
+    public function isTokenExpired(?Request $request = null): bool
+    {
+        $issuedAt = $this->session[$this->sessionTokenTimeLabel] ?? null;
+        if (is_numeric($issuedAt)) {
+            return (time() - (int) $issuedAt) > $this->tokenLifetime;
+        }
+
+        $presented = $this->post[$this->formTokenLabel] ?? null;
+        if ((!is_string($presented) || $presented === '') && $request) {
+            $presented = $request->getHeader('X-CSRF-Token');
+        }
+
+        return is_string($presented) && $presented !== '';
+    }
+
+    /** Force-issue a fresh CSRF token for the current session. */
+    public function refreshToken(): string
+    {
+        unset($this->session[$this->sessionTokenLabel], $this->session[$this->sessionTokenTimeLabel]);
+        return $this->getCSRFToken();
+    }
+
+    public function getTokenLifetime(): int
+    {
+        return $this->tokenLifetime;
+    }
+
+    public function getTokenFieldName(): string
+    {
+        return $this->formTokenLabel;
+    }
+
     public function insertHiddenToken(bool $echo = false): string
     {
         $csrfToken = $this->getCSRFToken();
@@ -129,34 +164,27 @@ class SecurityService
     {
         if (
             empty($this->session[$this->sessionTokenLabel]) ||
-            empty($this->session[$this->sessionTokenTimeLabel])
+            empty($this->session[$this->sessionTokenTimeLabel]) ||
+            $this->isTokenExpired()
         ) {
             return false;
         }
 
-        // Check expiry
-        if ((time() - $this->session[$this->sessionTokenTimeLabel]) > $this->tokenLifetime) {
-            return false;
-        }
-
         $csrfToken = $this->post[$this->formTokenLabel] ?? null;
-
-        if (!$csrfToken && $request) {
-            $csrfToken = $request->getHeader('X-Csrf-Token');
+        if ((!is_string($csrfToken) || $csrfToken === '') && $request) {
+            $csrfToken = $request->getHeader('X-CSRF-Token');
         }
 
-        if (!$csrfToken || !is_string($csrfToken)) {
+        if (!is_string($csrfToken) || $csrfToken === '') {
             return false;
         }
 
-        $expectedToken = $this->generateToken($this->session[$this->sessionTokenLabel]);
-
-        return hash_equals($csrfToken, $expectedToken);
+        return hash_equals(
+            $this->generateToken($this->session[$this->sessionTokenLabel]),
+            $csrfToken
+        );
     }
 
-    /**
-     * Generate a token using HMAC with optional IP-based salting.
-     */
     private function generateToken(string $baseToken): string
     {
         $data = $this->salt;
