@@ -15,3 +15,5 @@ This documentation is for maintainers of `jnana/framework` and developers who ne
 ## Source of truth
 
 The implementation is the source of truth. This guide describes the code included with this package version. When a public API changes, update the relevant guide and examples in the same pull request.
+
+- [Security Phase 6 — Database-Level Access Enforcement](security-phase-6.md)
