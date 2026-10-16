@@ -40,6 +40,15 @@ class DatabaseAuthStrategy implements AuthStrategyInterface
         $statusField = $this->configManager->get('Auth.statusField', 'is_active');
         $activeStatus = $this->configManager->get('Auth.activeStatusValue', true);
 
+        foreach ([$table, $usernameField, $emailField, $passwordField, $statusField] as $identifier) {
+            if ($identifier === null) {
+                continue;
+            }
+            if (!is_string($identifier) || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $identifier)) {
+                throw new \InvalidArgumentException('Invalid configured authentication database identifier.');
+            }
+        }
+
         $qb = $this->db->getConnection()->createQueryBuilder();
         $qb->select('*')
             ->from($table, 'u')
@@ -61,24 +70,30 @@ class DatabaseAuthStrategy implements AuthStrategyInterface
             return false;
         }
 
-        if (PasswordHasher::needsRehash($user[$passwordField])) {
-            $qb1 = clone $qb;
-            $qb1->update($table, 'u')
-                ->set("u.{$passwordField}", PasswordHasher::hash($password))
-                ->where($qb->expr()->eq("u.{$usernameField}", ':input'))
-                ->setParameter('input', $username)
-                ->executeStatement();
-        }
-
-        if (!PasswordHasher::verify($password, $user[$passwordField])) {
+        // Verify before any password mutation. Rehashing before verification would
+        // let an attacker replace a stored hash by submitting an incorrect password.
+        if (!PasswordHasher::verify($password, (string) ($user[$passwordField] ?? ''))) {
             $this->lastError = 'invalid_credentials';
             return false;
         }
 
-//        if ($password != $user[$passwordField]) {
-//            $this->lastError = 'invalid_credentials';
-//            return false;
-//        }
+        if (PasswordHasher::needsRehash((string) $user[$passwordField])) {
+            $idField = (string) $this->configManager->get('Auth.idField', 'id');
+            foreach ([$table, $passwordField, $idField] as $identifier) {
+                if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $identifier)) {
+                    throw new \InvalidArgumentException('Invalid configured authentication database identifier.');
+                }
+            }
+
+            $this->db->getConnection()->createQueryBuilder()
+                ->update($table, 'u')
+                ->set("u.{$passwordField}", ':new_hash')
+                ->where("u.{$idField} = :user_id")
+                ->setParameter('new_hash', PasswordHasher::hash($password))
+                ->setParameter('user_id', $user[$idField])
+                ->executeStatement();
+        }
+
 
 
         // Fetch roles

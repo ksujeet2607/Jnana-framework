@@ -36,6 +36,8 @@ class AuthManager
         $authenticated = $this->strategy->authenticate($username, $password);
 
         if ($authenticated && $this->getUser()) {
+            // Rotate the session identifier after successful authentication.
+            $this->sessionManager->regenerate();
             $this->sessionManager->set('user', $this->getUser());
             $this->lastError = null;
         } else {
@@ -89,6 +91,8 @@ class AuthManager
     {
         $this->strategy->logout();
         $this->sessionManager->remove('user');
+        // Rotate the identifier so the pre-logout session cannot be reused.
+        $this->sessionManager->regenerate();
     }
 
     public function getLastError(): ?string
@@ -129,7 +133,7 @@ class AuthManager
      */
     public function isAdminScope(): bool
     {
-        return $this->getUser()['scope'] === 'admin';
+        return ($this->getUser()['scope'] ?? null) === 'admin';
     }
 
     /**
@@ -138,7 +142,7 @@ class AuthManager
      */
     public function isCompanyScope(): bool
     {
-        return $this->getUser()['scope'] === 'company';
+        return ($this->getUser()['scope'] ?? null) === 'company';
     }
 
     /**
@@ -156,7 +160,8 @@ class AuthManager
 
     public function getUserCompanyId(): ?int
     {
-        return $this->user()['company_id'];
+        $companyId = $this->user()['company_id'] ?? null;
+        return is_numeric($companyId) ? (int) $companyId : null;
     }
 
 }
