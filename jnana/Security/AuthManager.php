@@ -2,6 +2,7 @@
 
 namespace Jnana\Security;
 
+use Core\ConfigManager;
 use Jnana\Session\SessionManager;
 use function DI\value;
 
@@ -10,6 +11,7 @@ class AuthManager
     private AuthStrategyInterface $strategy;
     private SessionManager $sessionManager;
     private ?string $lastError = null;
+    private ?ConfigManager $configManager;
 
     // Error code → message mapping
     private array $errorMessages = [
@@ -20,10 +22,14 @@ class AuthManager
         'session_expired'      => 'Your session has expired. Please log in again.',
     ];
 
-    public function __construct(AuthStrategyInterface $strategy, SessionManager $sessionManager)
-    {
+    public function __construct(
+        AuthStrategyInterface $strategy,
+        SessionManager $sessionManager,
+        ?ConfigManager $configManager = null
+    ) {
         $this->strategy = $strategy;
         $this->sessionManager = $sessionManager;
+        $this->configManager = $configManager;
 
         // Restore user from session if available
         if ($sessionManager->has('user')) {
@@ -123,8 +129,34 @@ class AuthManager
             return false;
         }
 
-        // Later: role → permission mapping
-        return true;
+        $permissions = $user['permissions'] ?? [];
+        if (!is_array($permissions)) {
+            return false;
+        }
+
+        if (in_array($permission, $permissions, true) || in_array('*', $permissions, true)) {
+            return true;
+        }
+
+        // Keep auth()->can() consistent with route authorization when an app
+        // defines role-to-permission mappings. Missing mappings deny by default.
+        $rolePermissions = $this->configManager?->get('Authorization.role_permissions', []) ?? [];
+        $roles = $user['roles'] ?? [];
+        if (!is_array($rolePermissions) || !is_array($roles)) {
+            return false;
+        }
+
+        foreach ($roles as $role) {
+            if (!is_string($role)) {
+                continue;
+            }
+            $mapped = $rolePermissions[$role] ?? [];
+            if (is_array($mapped) && (in_array($permission, $mapped, true) || in_array('*', $mapped, true))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

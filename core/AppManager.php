@@ -199,14 +199,8 @@ final class AppManager
             $controller = $this->container->get($controllerClass);
 
             /* ---------------------------------------------------------
-             * Controller BEFORE hook
-             * ------------------------------------------------------- */
-            if ($controller instanceof ControllerLifecycle) {
-                $controller->beforeAction($request);
-            }
-
-            /* ---------------------------------------------------------
              * 3. Route middleware + Guards + Controller execution
+             * Authorization must complete before controller lifecycle hooks run.
              * ------------------------------------------------------- */
             $this->logger->info('Executing route middlewares, guards and controller');
 
@@ -219,6 +213,10 @@ final class AppManager
             };
 
             $controllerCallable = function (Request $req, Response $res) use ($controller, $action, $params) {
+                if ($controller instanceof ControllerLifecycle) {
+                    $controller->beforeAction($req);
+                }
+
                 return $controller->{$action}(...array_values($params));
             };
 
