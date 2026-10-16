@@ -11,7 +11,7 @@ class AuthManager
     private AuthStrategyInterface $strategy;
     private SessionManager $sessionManager;
     private ?string $lastError = null;
-    private ?ConfigManager $configManager;
+    private ConfigManager $configManager;
 
     // Error code → message mapping
     private array $errorMessages = [
@@ -25,7 +25,8 @@ class AuthManager
     public function __construct(
         AuthStrategyInterface $strategy,
         SessionManager $sessionManager,
-        ?ConfigManager $configManager = null
+        ConfigManager $configManager,
+        private ?SecurityAuditLogger $auditLogger = null
     ) {
         $this->strategy = $strategy;
         $this->sessionManager = $sessionManager;
@@ -46,6 +47,9 @@ class AuthManager
             $this->sessionManager->regenerate();
             $this->sessionManager->set('user', $this->getUser());
             $this->lastError = null;
+            $this->audit('authentication.succeeded', [
+                'user_id' => $this->getUser()['id'] ?? null,
+            ]);
         } else {
             // Capture error from strategy
             $code = method_exists($this->strategy, 'getLastError')
@@ -53,9 +57,21 @@ class AuthManager
                 : 'authentication_failed';
 
             $this->lastError = $this->errorMessages[$code] ?? $this->errorMessages['authentication_failed'];
+            $this->audit('authentication.failed', [
+                'reason' => is_string($code) ? $code : 'authentication_failed',
+            ]);
         }
 
         return $authenticated;
+    }
+
+    private function audit(string $event, array $context): void
+    {
+        try {
+            $this->auditLogger?->record($event, $context);
+        } catch (\Throwable) {
+            // Audit logging must not break authentication or logout flows.
+        }
     }
 
     public function getUser(): ?array
@@ -95,6 +111,9 @@ class AuthManager
 
     public function logout(): void
     {
+        $this->audit('authentication.logout', [
+            'user_id' => $this->getUser()['id'] ?? null,
+        ]);
         $this->strategy->logout();
         $this->sessionManager->remove('user');
         // Rotate the identifier so the pre-logout session cannot be reused.

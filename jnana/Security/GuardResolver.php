@@ -7,6 +7,9 @@ namespace Jnana\Security;
 use DI\Container;
 use Jnana\Contracts\GuardInterface;
 use Jnana\Http\Request;
+use Jnana\Exceptions\ForbiddenException;
+use Jnana\Exceptions\UnauthorizedException;
+use Throwable;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -64,20 +67,44 @@ final class GuardResolver
 
         foreach ($authorizeAttributes as $attribute) {
             $metadata = $attribute->newInstance();
-            $authorization->authorize(
-                $metadata->roles,
-                $metadata->permissions,
-                $metadata->requireAllPermissions
-            );
+            try {
+                $authorization->authorize(
+                    $metadata->roles,
+                    $metadata->permissions,
+                    $metadata->requireAllPermissions
+                );
+            } catch (UnauthorizedException|ForbiddenException $e) {
+                $this->auditAuthorizationDenial($request, $controller, $method, $e);
+                throw $e;
+            }
         }
 
         foreach ($permissionAttributes as $attribute) {
             $metadata = $attribute->newInstance();
-            $authorization->authorize(
-                [],
-                $metadata->names(),
-                $metadata->requireAll
-            );
+            try {
+                $authorization->authorize(
+                    [],
+                    $metadata->names(),
+                    $metadata->requireAll
+                );
+            } catch (UnauthorizedException|ForbiddenException $e) {
+                $this->auditAuthorizationDenial($request, $controller, $method, $e);
+                throw $e;
+            }
+        }
+    }
+
+    private function auditAuthorizationDenial(Request $request, string $controller, string $method, Throwable $exception): void
+    {
+        try {
+            $audit = $this->container->get(SecurityAuditLogger::class);
+            $audit->record('authorization.denied', [
+                'controller' => $controller,
+                'action' => $method,
+                'reason' => $exception instanceof UnauthorizedException ? 'unauthenticated' : 'forbidden',
+            ], $request);
+        } catch (Throwable) {
+            // Audit failures must not bypass authorization or hide the original denial.
         }
     }
 }

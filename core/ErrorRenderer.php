@@ -24,7 +24,8 @@ final class ErrorRenderer
     public static function render(
         int $statusCode,
         string $message = '',
-        ?Throwable $exception = null
+        ?Throwable $exception = null,
+        ?string $correlationId = null
     ): string {
         $details = self::detailsFor($statusCode);
         $message = trim($message) !== ''
@@ -41,14 +42,15 @@ final class ErrorRenderer
                     'message' => $message,
                     'description' => $details['description'],
                     'suggestions' => $details['suggestions'],
-                    'exception' => $exception,
+                    'exception' => (getenv('APP_ENV') ?: 'production') === 'development' ? $exception : null,
+                    'correlationId' => $correlationId,
                 ])->getBody();
             }
         } catch (Throwable) {
             // Error rendering must never trigger a second uncaught rendering error.
         }
 
-        return self::fallbackHtml($statusCode, $message, $details);
+        return self::fallbackHtml($statusCode, $message, $details, $correlationId);
     }
 
     /**
@@ -167,7 +169,8 @@ final class ErrorRenderer
     private static function fallbackHtml(
         int $statusCode,
         string $message,
-        array $details
+        array $details,
+        ?string $correlationId = null
     ): string {
         $safeStatus = (string) $statusCode;
         $safeTitle = self::escape($details['title']);
@@ -180,6 +183,9 @@ final class ErrorRenderer
         }
 
         $year = date('Y');
+        $reference = $correlationId !== null && preg_match('/^[a-f0-9]{32}$/', $correlationId)
+            ? '<p class="reference">Reference ID: <code>' . self::escape($correlationId) . '</code></p>'
+            : '';
 
         return <<<HTML
 <!doctype html>
@@ -320,6 +326,8 @@ final class ErrorRenderer
         .button:hover { background: #f8fafc; border-color: #cbd5e1; }
         .button-primary { color: #fff; border-color: var(--accent); background: var(--accent); }
         .button-primary:hover { color: #fff; border-color: var(--accent-hover); background: var(--accent-hover); }
+        .reference { margin: 22px 0 0; color: #7b8796; font-size: .82rem; }
+        .reference code { font-family: ui-monospace, monospace; }
         .card-footer {
             display: flex;
             flex-wrap: wrap;
@@ -336,7 +344,9 @@ final class ErrorRenderer
             .help { padding: 18px; }
             .actions { flex-direction: column; }
             .button { width: 100%; }
-            .card-footer { flex-direction: column; }
+            .reference { margin: 22px 0 0; color: #7b8796; font-size: .82rem; }
+        .reference code { font-family: ui-monospace, monospace; }
+        .card-footer { flex-direction: column; }
         }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { transition: none !important; }
@@ -362,6 +372,7 @@ final class ErrorRenderer
                     <h2>What you can do</h2>
                     <ul>{$suggestions}</ul>
                 </div>
+                {$reference}
                 <nav class="actions" aria-label="Error page actions">
                     <a class="button button-primary" href="/">Go to home page</a>
                     <a class="button" href="javascript:history.back()">Go back</a>

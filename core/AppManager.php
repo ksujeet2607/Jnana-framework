@@ -17,6 +17,7 @@ use Jnana\Middleware\MiddlewareDispatcher;
 use Jnana\Security\GuardResolver;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Throwable;
 
 
 /**
@@ -96,6 +97,7 @@ final class AppManager
     {
         // Create request and bind it to container
         $request = new Request();
+        $request->setAttribute('correlation_id', bin2hex(random_bytes(16)));
         $this->container->set(Request::class, $request);
         $this->container->set('request', $request);
 
@@ -153,11 +155,14 @@ final class AppManager
         $request  = $this->container->get(Request::class);
         $response = new Response();
 
+        $correlationId = (string) $request->getAttribute('correlation_id', bin2hex(random_bytes(16)));
         $response->addHeader('X-Requested-Url', $uri);
+        $response->addHeader('X-Correlation-ID', $correlationId);
 
         $this->logger->info('Request started', [
             'method' => $method,
             'uri'    => $uri,
+            'correlation_id' => $correlationId,
         ]);
 
         try {
@@ -274,18 +279,21 @@ final class AppManager
             /* ---------------------------------------------------------
              * 5. Send response (single exit point)
              * ------------------------------------------------------- */
+            $response->addHeader('X-Correlation-ID', $correlationId);
             $this->logger->info('Sending response', [
                 'status' => $response->getStatusCode(),
+                'correlation_id' => $correlationId,
             ]);
 
             $response->send();
         }
         catch (CSRFTokenExpiredException $e) {
-            $this->logger->notice('CSRF token expired', ['method' => $method, 'uri' => $uri]);
+            $this->logger->notice('CSRF token expired', ['method' => $method, 'uri' => $uri, 'correlation_id' => $correlationId]);
 
             $expiredResponse = (new Response())
                 ->setStatusCode(419)
-                ->addHeader('Cache-Control', 'no-store, private');
+                ->addHeader('Cache-Control', 'no-store, private')
+                ->addHeader('X-Correlation-ID', $correlationId);
 
             if ($request->isApiRequest() || $request->isAjax() || $request->expectsJson()) {
                 $expiredResponse
@@ -294,6 +302,7 @@ final class AppManager
                         'error' => 'csrf_token_expired',
                         'message' => 'Your form session has expired. The token can be refreshed; review and submit again.',
                         'refresh_url' => '/security/csrf-token',
+                        'correlation_id' => $correlationId,
                     ]);
             } else {
                 $expiredResponse
@@ -335,10 +344,12 @@ HTML);
             return;
         }
         catch (CSRFValidationException $e) {
-            $this->logger->warning('CSRF validation failed', ['method' => $method, 'uri' => $uri]);
+            $this->logger->warning('CSRF validation failed', ['method' => $method, 'uri' => $uri, 'correlation_id' => $correlationId]);
+            try { $this->container->get(\Jnana\Security\SecurityAuditLogger::class)->record('csrf.rejected', ['reason' => 'invalid_token'], $request); } catch (Throwable) {}
 
             (new Response())
                 ->setStatusCode(403)
+                ->addHeader('X-Correlation-ID', $correlationId)
                 ->addHeader('Cache-Control', 'no-store, private')
                 ->addHeader('Content-Type', 'application/json')
                 ->setBody([
@@ -353,20 +364,26 @@ HTML);
             $this->logger->warning('HTTP exception', [
                 'status' => $e->getStatusCode(),
                 'message' => $e->getMessage(),
+                'correlation_id' => $correlationId,
             ]);
 
             if ($request->isApiRequest()) {
                 (new Response())
                     ->setStatusCode($e->getStatusCode())
+                    ->addHeader('X-Correlation-ID', $correlationId)
                     ->setBody([
-                        'error' => $e->getMessage()
+                        'error' => 'http_error',
+                        'message' => $e->getStatusCode() >= 500 ? 'The request could not be completed.' : $e->getMessage(),
+                        'correlation_id' => $correlationId,
                     ])
                     ->send();
                 return;
             }
 
             if ($e instanceof UnauthorizedException) {
-                (new RedirectResponse(getenv('DEFAULT_DOMAIN')))->send();
+                (new RedirectResponse(getenv('DEFAULT_DOMAIN')))
+                    ->addHeader('X-Correlation-ID', $correlationId)
+                    ->send();
                 return;
             }
 
@@ -374,28 +391,56 @@ HTML);
             (new Response())
                 ->setStatusCode($e->getStatusCode())
                 ->setBody(
-                    ErrorRenderer::render($e->getStatusCode(), $e->getMessage(), $e)
+                    ErrorRenderer::render(
+                        $e->getStatusCode(),
+                        $e->getStatusCode() >= 500 ? '' : $e->getMessage(),
+                        $e,
+                        $correlationId
+                    )
                 )
+                ->addHeader('X-Correlation-ID', $correlationId)
                 ->send();
             return;
         }
-        catch (Exception $e) {
-
-            $this->logger->error('Unhandled exception', [
+        catch (Throwable $e) {
+            $this->logger->error('Unhandled request failure', [
                 'method' => $method,
                 'uri' => $uri,
+                'correlation_id' => $correlationId,
                 'exception' => $e,
             ]);
 
-            if ($request->isApiRequest()) {
-                (new Response())
-                    ->setStatusCode(500)
-                    ->setBody(['error' => 'Internal server error'])
-                    ->send();
-                return;
+            try {
+                $this->container->get(\Jnana\Security\SecurityAuditLogger::class)->record(
+                    'application.exception',
+                    ['exception_class' => get_class($e)],
+                    $request
+                );
+            } catch (Throwable) {
+                // Logging must not trigger a second application failure.
             }
 
-            throw $e; // Let Tracy / debugger handle it
+            $errorResponse = (new Response())
+                ->setStatusCode(500)
+                ->addHeader('Cache-Control', 'no-store, private')
+                ->addHeader('X-Correlation-ID', $correlationId);
+
+            if ($request->isApiRequest() || $request->isAjax() || $request->expectsJson()) {
+                $errorResponse
+                    ->addHeader('Content-Type', 'application/json; charset=utf-8')
+                    ->setBody([
+                        'error' => 'internal_server_error',
+                        'message' => 'An unexpected error occurred. Contact support with the correlation ID.',
+                        'correlation_id' => $correlationId,
+                    ]);
+            } else {
+                $errorResponse
+                    ->addHeader('Content-Type', 'text/html; charset=utf-8')
+                    ->setBody(ErrorRenderer::render(500, '', null, $correlationId));
+            }
+
+            $errorResponse->send();
+            return;
         }
 
     }

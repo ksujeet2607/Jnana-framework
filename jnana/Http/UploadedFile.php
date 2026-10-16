@@ -42,7 +42,15 @@ class UploadedFile
 
     public function move(string $directory, ?string $name = null): string
     {
-        $filename = $name ?: $this->getName();
+        $filename = $name ?: basename(str_replace('\\', '/', $this->getName()));
+        if ($filename === '' || $filename === '.' || $filename === '..'
+            || str_contains($filename, '/') || str_contains($filename, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $filename)) {
+            throw new \InvalidArgumentException('Invalid uploaded filename.');
+        }
+        if (!is_dir($directory) || !is_writable($directory)) {
+            throw new \RuntimeException('Upload destination must exist and be writable.');
+        }
 
         $path = rtrim($directory, DIRECTORY_SEPARATOR)
             . DIRECTORY_SEPARATOR

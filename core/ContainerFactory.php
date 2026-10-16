@@ -82,6 +82,14 @@ final class ContainerFactory
                 }
                 return $c->get(FileAuthStrategy::class);
             },
+            \Jnana\Security\AuthManager::class => function (ContainerInterface $c) use ($config) {
+                return new \Jnana\Security\AuthManager(
+                    $c->get(AuthStrategyInterface::class),
+                    $c->get(\Jnana\Session\SessionManager::class),
+                    $config,
+                    $c->get(\Jnana\Security\SecurityAuditLogger::class)
+                );
+            },
         ]);
 
         $logger->info('Auth strategy registered');
